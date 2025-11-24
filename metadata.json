@@ -1,0 +1,5 @@
+{
+  "name": "Project EVA: Human Instrumentality",
+  "description": "An immersive, full-page scrolling experience dedicated to Evangelion. Features AI-generated artwork using Gemini 2.5 Flash Image, interactive Canvas particle effects, and pixel manipulation.",
+  "requestFramePermissions": []
+}
