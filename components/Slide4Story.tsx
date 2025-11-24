@@ -1,20 +1,42 @@
 import React from 'react';
-import { SlideData } from '../types';
+import { SlideData, Tab } from '../types';
 
 interface Props {
   data: SlideData;
   bgImage: string | null;
+  onNavigate: (tab: Tab) => void;
 }
 
-const Slide4Story: React.FC<Props> = ({ data, bgImage }) => {
+const Slide4Story: React.FC<Props> = ({ data, bgImage, onNavigate }) => {
+    const downloadBg = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!bgImage) return;
+        const link = document.createElement('a');
+        link.href = bgImage;
+        link.download = `EVA_BACKGROUND_${data.id}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
   return (
-    <div className="relative w-full h-full bg-red-950/20 overflow-hidden flex items-center justify-center">
+    <div className="relative w-full h-full bg-red-950/20 overflow-hidden flex items-center justify-center group/slide">
       {/* Background */}
       {bgImage && (
         <div 
           className="absolute inset-0 z-0 bg-cover bg-center opacity-50 sepia mix-blend-overlay"
           style={{ backgroundImage: `url(${bgImage})` }}
         />
+      )}
+      
+      {bgImage && (
+          <button 
+            onClick={downloadBg}
+            className="absolute top-4 right-4 z-40 text-white/50 hover:text-white border border-white/20 hover:border-white/80 p-2 rounded transition-all opacity-0 group-hover/slide:opacity-100"
+            title="Download Background"
+          >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          </button>
       )}
       
       {/* Target UI Overlay */}
@@ -41,8 +63,12 @@ const Slide4Story: React.FC<Props> = ({ data, bgImage }) => {
                  <p>{'>'} TARGET: GEOFRONT</p>
              </div>
              
-             <button className="mt-8 px-8 py-3 bg-red-600 text-black font-bold hover:bg-red-500 transition-colors uppercase tracking-widest clip-path-polygon">
-                Launch Countermeasures
+             <button 
+                onClick={() => onNavigate('STORY')}
+                className="mt-8 px-8 py-3 bg-red-600 text-black font-bold hover:bg-red-500 transition-colors uppercase tracking-widest clip-path-polygon cursor-pointer relative overflow-hidden group"
+             >
+                <span className="relative z-10">Launch Countermeasures</span>
+                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity"></div>
              </button>
          </div>
       </div>

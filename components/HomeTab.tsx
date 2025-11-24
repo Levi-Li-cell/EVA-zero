@@ -4,7 +4,11 @@ import Slide1Hero from './Slide1Hero';
 import Slide2Characters from './Slide2Characters';
 import Slide3Mecha from './Slide3Mecha';
 import Slide4Story from './Slide4Story';
-import { SlideData } from '../types';
+import { SlideData, Tab } from '../types';
+
+interface Props {
+  onNavigate: (tab: Tab) => void;
+}
 
 const SLIDES: SlideData[] = [
   {
@@ -37,7 +41,7 @@ const SLIDES: SlideData[] = [
   },
 ];
 
-const HomeTab: React.FC = () => {
+const HomeTab: React.FC<Props> = ({ onNavigate }) => {
   const [images, setImages] = useState<Record<number, string>>({});
   
   useEffect(() => {
@@ -74,7 +78,7 @@ const HomeTab: React.FC = () => {
 
          {/* Slide 4 */}
          <section className="w-full h-screen snap-start relative">
-             <Slide4Story data={SLIDES[3]} bgImage={images[4] || null} />
+             <Slide4Story data={SLIDES[3]} bgImage={images[4] || null} onNavigate={onNavigate} />
         </section>
     </div>
   );

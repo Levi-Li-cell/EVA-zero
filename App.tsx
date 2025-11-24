@@ -14,7 +14,7 @@ const App: React.FC = () => {
       
       {/* Tab Content Container */}
       <div className="w-full h-full pt-0">
-          {activeTab === 'HOME' && <HomeTab />}
+          {activeTab === 'HOME' && <HomeTab onNavigate={setActiveTab} />}
           {activeTab === 'CHARACTERS' && <CharactersTab />}
           {activeTab === 'STORY' && <StoryTab />}
       </div>

@@ -1,8 +1,149 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CharacterProfile, TrinityItem } from '../types';
 import { generateEvaImage } from '../services/geminiService';
 
 // --- Sub-components ---
+
+// 1. EVA Slicer Canvas Component
+const EvaSlicerTitle: React.FC = () => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let animationId: number;
+        let time = 0;
+
+        const resize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Create an offscreen canvas to render the base text
+        const buffer = document.createElement('canvas');
+        const bCtx = buffer.getContext('2d');
+
+        const render = () => {
+            if (!bCtx) return;
+            
+            // 1. Draw pure text to offscreen buffer
+            buffer.width = canvas.width;
+            buffer.height = canvas.height;
+            
+            bCtx.fillStyle = '#000000'; // Background
+            bCtx.fillRect(0, 0, buffer.width, buffer.height);
+            
+            // Calculate dynamic font size to fill ~90% of width
+            const text = "EVA";
+            bCtx.font = `900 100px 'Orbitron'`; // Seed size
+            const metrics = bCtx.measureText(text);
+            // Scale factor: Target Width / Current Width
+            const targetWidth = canvas.width * 0.95; 
+            const scale = targetWidth / metrics.width;
+            const fontSize = 100 * scale;
+
+            bCtx.font = `900 ${fontSize}px 'Orbitron', sans-serif`;
+            bCtx.textAlign = 'center';
+            bCtx.textBaseline = 'middle';
+            // Classic Gainax Title Card Style: White text on Black, or high contrast
+            bCtx.fillStyle = '#FFFFFF'; 
+            bCtx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+            // 2. Main Draw Loop: Slice and dice
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const sliceHeight = Math.max(4, canvas.height / 120); 
+            const numSlices = Math.ceil(canvas.height / sliceHeight);
+
+            for (let i = 0; i < numSlices; i++) {
+                const sy = i * sliceHeight;
+                const sh = sliceHeight;
+                
+                // --- SLIDING DISTORTION ALGORITHM ---
+                let offset = 0;
+                
+                // 1. Large Block Shifts (The "TARE" look)
+                // Group slices into large blocks
+                const blockSize = 20; // Slices per block
+                const blockIndex = Math.floor(i / blockSize);
+                
+                // Static shifts based on block index (gives the broken jagged look)
+                if (blockIndex % 3 === 0) offset += 15;
+                if (blockIndex % 7 === 0) offset -= 15;
+                if (blockIndex % 5 === 0) offset += 30;
+
+                // 2. Dynamic Sliding
+                // Blocks slide horizontally over time
+                const slideSpeed = Math.sin(time * 0.5 + blockIndex);
+                if (blockIndex % 2 === 0) {
+                    offset += slideSpeed * 20; 
+                } else {
+                    offset -= slideSpeed * 20;
+                }
+
+                // 3. Glitch Spikes
+                // Occasional extreme horizontal shift
+                if (Math.random() > 0.98) {
+                     offset += (Math.random() - 0.5) * 200;
+                }
+
+                // 4. Scanline Wave
+                // A wave that travels down pushing pixels
+                const wavePos = (time * 1500) % (canvas.height + 500) - 250;
+                const distToWave = Math.abs(sy - wavePos);
+                if (distToWave < 150) {
+                     const force = (150 - distToWave) / 150;
+                     offset += Math.sin(distToWave * 0.1) * force * 100;
+                     // Chromatic aberration trigger
+                }
+
+                // Draw the slice
+                ctx.drawImage(
+                    buffer,
+                    0, sy, buffer.width, sh, // Source
+                    offset, sy, buffer.width, sh // Dest (shifted x)
+                );
+            }
+
+            // Optional: Green overlay for that "Monitor" feel
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.02)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            time += 0.02;
+            animationId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+            window.removeEventListener('resize', resize);
+            cancelAnimationFrame(animationId);
+        };
+    }, []);
+
+    return (
+        <div className="relative w-full h-full bg-black overflow-hidden">
+            <canvas ref={canvasRef} className="w-full h-full block" />
+            
+            {/* Vignette & Scanlines */}
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_60%,#000_100%)]" />
+            <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,6px_100%]" />
+            
+            <div className="absolute bottom-10 left-10 pointer-events-none z-10">
+                <div className="bg-red-600 text-black font-bold font-mono text-xl px-4 py-2 inline-block transform -skew-x-12 animate-pulse shadow-[0_0_10px_red]">
+                     TOP SECRET
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const AccordionItem: React.FC<{ char: CharacterProfile; expanded: boolean; onClick: () => void; image: string | null }> = ({ char, expanded, onClick, image }) => {
     return (
@@ -98,6 +239,16 @@ const TrinityCarousel: React.FC = () => {
 
     const current = items[activeIndex];
 
+    const downloadImage = (url: string, name: string) => {
+        if (!url) return;
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `EVA_DATA_${name.replace(/\s+/g, '_').toUpperCase()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="w-full h-full flex items-center justify-center bg-black relative overflow-hidden">
              {/* Background decorative rings */}
@@ -116,6 +267,15 @@ const TrinityCarousel: React.FC = () => {
                      {/* Pilot */}
                      <div className="relative group overflow-hidden border border-gray-800 bg-gray-900 rounded-lg transform transition-all hover:-translate-y-2">
                          <div className="absolute top-2 left-2 text-xs font-mono text-gray-400 z-20">PILOT</div>
+                         {images[`p-${activeIndex}`] && (
+                            <button 
+                                onClick={() => downloadImage(images[`p-${activeIndex}`], current.pilot)}
+                                className="absolute top-2 right-2 text-white bg-black/50 p-1 rounded hover:bg-orange-500 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Download Data"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            </button>
+                         )}
                          <div className="absolute inset-0 bg-cover bg-center transition-all duration-500" 
                               style={{ backgroundImage: `url(${images[`p-${activeIndex}`]})` }} />
                          <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black to-transparent">
@@ -126,6 +286,15 @@ const TrinityCarousel: React.FC = () => {
                      {/* Unit */}
                      <div className="relative group overflow-hidden border border-gray-800 bg-gray-900 rounded-lg transform transition-all scale-110 z-20 shadow-2xl shadow-purple-900/20">
                          <div className="absolute top-2 left-2 text-xs font-mono text-gray-400 z-20">EVA UNIT</div>
+                         {images[`u-${activeIndex}`] && (
+                            <button 
+                                onClick={() => downloadImage(images[`u-${activeIndex}`], current.unit)}
+                                className="absolute top-2 right-2 text-white bg-black/50 p-1 rounded hover:bg-orange-500 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Download Data"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            </button>
+                         )}
                          <div className="absolute inset-0 bg-cover bg-center transition-all duration-500" 
                               style={{ backgroundImage: `url(${images[`u-${activeIndex}`]})` }} />
                          <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black to-transparent">
@@ -136,6 +305,15 @@ const TrinityCarousel: React.FC = () => {
                      {/* Angel */}
                      <div className="relative group overflow-hidden border border-gray-800 bg-gray-900 rounded-lg transform transition-all hover:-translate-y-2">
                          <div className="absolute top-2 left-2 text-xs font-mono text-gray-400 z-20">HOSTILE</div>
+                         {images[`a-${activeIndex}`] && (
+                            <button 
+                                onClick={() => downloadImage(images[`a-${activeIndex}`], current.angel)}
+                                className="absolute top-2 right-2 text-white bg-black/50 p-1 rounded hover:bg-orange-500 z-30 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Download Data"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            </button>
+                         )}
                          <div className="absolute inset-0 bg-cover bg-center transition-all duration-500" 
                               style={{ backgroundImage: `url(${images[`a-${activeIndex}`]})` }} />
                          <div className="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black to-transparent">
@@ -191,17 +369,9 @@ const CharactersTab: React.FC = () => {
 
     return (
         <div className="w-full h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar scroll-smooth bg-black">
-            {/* Scroll 1: Intro */}
-            <section className="w-full h-screen snap-start relative flex items-center justify-center bg-gray-900 overflow-hidden">
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.1)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-                <div className="z-10 text-center">
-                    <h1 className="text-8xl md:text-9xl font-display font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-600 mb-4 tracking-tighter">
-                        PERSONNEL
-                    </h1>
-                    <div className="bg-orange-500 text-black font-bold font-mono text-xl px-4 py-2 inline-block transform -skew-x-12">
-                        CLASSIFIED INFORMATION
-                    </div>
-                </div>
+            {/* Scroll 1: EVA Slicer Intro */}
+            <section className="w-full h-screen snap-start relative flex items-center justify-center bg-black overflow-hidden">
+                <EvaSlicerTitle />
             </section>
 
             {/* Scroll 2: Accordion */}
